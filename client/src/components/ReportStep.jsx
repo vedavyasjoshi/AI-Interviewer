@@ -1,4 +1,45 @@
-// Final step: render the LLM-generated evaluation report.
+import ScoreGauge from './charts/ScoreGauge.jsx';
+import RadarChart from './charts/RadarChart.jsx';
+import Sparkline from './charts/Sparkline.jsx';
+import Confetti from './charts/Confetti.jsx';
+import { useCountUp } from '../hooks/useCountUp.js';
+import { clampScore, scoreColor, scoreBand } from '../scoreUtils.js';
+
+// Animated competency bar with a count-up chip and a color-coded fill.
+function CompetencyBar({ name, score, note, delay = 0 }) {
+  const val = useCountUp(clampScore(score), { duration: 1100, delay });
+  const color = scoreColor(score);
+  return (
+    <div className="comp-row">
+      <div className="comp-head">
+        <span>{name}</span>
+        <span className="comp-chip" style={{ color, borderColor: `${color}66` }}>
+          {Math.round(val)}
+        </span>
+      </div>
+      <div className="bar">
+        <div style={{ width: `${val}%`, background: color }} />
+      </div>
+      {note && <div className="comp-note">{note}</div>}
+    </div>
+  );
+}
+
+// Color-coded per-question card: colored left border + score chip.
+function QuestionCard({ index, question, score, feedback }) {
+  const color = scoreColor(score);
+  return (
+    <div className="pq" style={{ borderLeft: `4px solid ${color}` }}>
+      <span className="pq-chip" style={{ color, borderColor: `${color}66` }}>
+        {score}
+      </span>
+      <div className="pq-q">Q{index + 1}: {question}</div>
+      {feedback && <div className="pq-fb">{feedback}</div>}
+    </div>
+  );
+}
+
+// Final step: render the LLM-generated evaluation report as a dashboard.
 export default function ReportStep({ report, role, onRestart }) {
   if (!report) return null;
   const {
@@ -10,44 +51,63 @@ export default function ReportStep({ report, role, onRestart }) {
     perQuestion = [],
   } = report;
 
-  return (
-    <div className="card">
-      <div className="step-label">Results</div>
-      <h2>Interview report — {role}</h2>
+  const overall = clampScore(overallScore);
+  const band = scoreBand(overall);
+  const bandColor = scoreColor(overall);
+  const celebrate = overall >= 80;
 
-      <div className="score-ring">
-        <div className="score-num">
-          {overallScore}
-          <span>/100</span>
-        </div>
-        <div style={{ flex: 1 }}>
-          <div className="bar">
-            <div style={{ width: `${Math.max(0, Math.min(100, overallScore))}%` }} />
+  const radarData = competencyScores.map((c) => ({
+    name: c.name,
+    score: clampScore(c.score),
+  }));
+  const trend = perQuestion.map((q) => clampScore(q.score));
+
+  return (
+    <div className="report">
+      <Confetti fire={celebrate} />
+
+      {/* Hero header: gauge + verdict + summary */}
+      <div className="card hero">
+        <div className="step-label">Results</div>
+        <div className="hero-grid">
+          <ScoreGauge score={overall} />
+          <div className="hero-body">
+            <h2 className="hero-title">Interview report — {role}</h2>
+            <div className={`band band-${band.tone}`} style={{ borderColor: `${bandColor}66`, color: bandColor }}>
+              {band.label}
+            </div>
+            {summary && <p className="hero-summary">{summary}</p>}
           </div>
-          <p className="small muted" style={{ marginTop: 10 }}>{summary}</p>
         </div>
       </div>
 
-      {competencyScores.length > 0 && (
-        <>
-          <h3>Competencies</h3>
-          {competencyScores.map((c, i) => (
-            <div className="comp-row" key={i}>
-              <div className="comp-head">
-                <span>{c.name}</span>
-                <span>{c.score}/100</span>
-              </div>
-              <div className="bar">
-                <div style={{ width: `${Math.max(0, Math.min(100, c.score))}%` }} />
-              </div>
-              {c.note && <div className="comp-note">{c.note}</div>}
+      {/* Radar + strengths/improvements side by side */}
+      <div className="dash-grid">
+        {radarData.length >= 3 && (
+          <div className="card">
+            <h3>Competency profile</h3>
+            <div className="radar-wrap">
+              <RadarChart data={radarData} />
             </div>
-          ))}
-        </>
-      )}
+          </div>
+        )}
 
-      <div className="two-col" style={{ marginTop: 8 }}>
-        <div>
+        <div className="card">
+          <h3>Breakdown</h3>
+          {competencyScores.map((c, i) => (
+            <CompetencyBar
+              key={i}
+              name={c.name}
+              score={c.score}
+              note={c.note}
+              delay={i * 120}
+            />
+          ))}
+        </div>
+      </div>
+
+      <div className="two-col">
+        <div className="card">
           <h3>Strengths</h3>
           <ul className="list">
             {strengths.map((s, i) => (
@@ -55,7 +115,7 @@ export default function ReportStep({ report, role, onRestart }) {
             ))}
           </ul>
         </div>
-        <div>
+        <div className="card">
           <h3>Areas to improve</h3>
           <ul className="list">
             {improvements.map((s, i) => (
@@ -65,20 +125,30 @@ export default function ReportStep({ report, role, onRestart }) {
         </div>
       </div>
 
+      {/* Per-question timeline */}
       {perQuestion.length > 0 && (
-        <>
-          <h3>Per-question feedback</h3>
-          {perQuestion.map((q, i) => (
-            <div className="pq" key={i}>
-              <span className="pq-score">{q.score}/100</span>
-              <div className="pq-q">Q{i + 1}: {q.question}</div>
-              {q.feedback && <div className="pq-fb">{q.feedback}</div>}
+        <div className="card">
+          <h3>Score across questions</h3>
+          {trend.length >= 2 && (
+            <div className="spark-wrap">
+              <Sparkline scores={trend} />
             </div>
-          ))}
-        </>
+          )}
+          <div className="pq-list">
+            {perQuestion.map((q, i) => (
+              <QuestionCard
+                key={i}
+                index={i}
+                question={q.question}
+                score={q.score}
+                feedback={q.feedback}
+              />
+            ))}
+          </div>
+        </div>
       )}
 
-      <div className="row" style={{ marginTop: 20 }}>
+      <div className="row" style={{ marginTop: 4 }}>
         <div className="spacer" />
         <button className="primary" onClick={onRestart}>
           Start a new interview

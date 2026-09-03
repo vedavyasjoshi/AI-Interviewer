@@ -186,27 +186,116 @@ textarea {
   font-size: 14px;
 }
 
-/* Report */
-.score-ring {
-  display: flex; align-items: center; gap: 20px; margin-bottom: 8px;
+/* Report dashboard */
+.report { animation: fadeUp 0.5s ease both; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
 }
-.score-num { font-size: 48px; font-weight: 800; }
-.score-num span { font-size: 20px; color: var(--muted); font-weight: 500; }
 
+/* Hero header */
+.hero-grid {
+  display: flex;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+}
+.hero-body { flex: 1; min-width: 240px; }
+.hero-title { margin: 0 0 12px; font-size: 20px; }
+.hero-summary { color: var(--muted); line-height: 1.6; margin: 12px 0 0; font-size: 14px; }
+
+.band {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+  letter-spacing: 0.2px;
+}
+
+/* Radial gauge */
+.gauge { position: relative; flex-shrink: 0; }
+.gauge svg circle:last-of-type { transition: stroke-dashoffset 0.05s linear; }
+.gauge-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+}
+.gauge-num { font-size: 44px; font-weight: 800; line-height: 1; }
+.gauge-num span { font-size: 16px; color: var(--muted); font-weight: 500; }
+
+/* Dashboard grid: radar + breakdown */
+.dash-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 1fr) 1fr;
+  gap: 16px;
+}
+@media (max-width: 720px) { .dash-grid { grid-template-columns: 1fr; } }
+
+.radar-wrap { display: flex; justify-content: center; padding: 8px 6px; overflow: visible; }
+.radar { max-width: 100%; height: auto; overflow: visible; }
+.radar-label { fill: var(--muted); font-size: 11px; font-weight: 600; }
+
+/* Competency bars */
 .bar { background: var(--panel-2); border-radius: 999px; height: 10px; overflow: hidden; border: 1px solid var(--border); }
-.bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
-.comp-row { margin-bottom: 12px; }
-.comp-head { display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 5px; }
+.bar > div { height: 100%; background: var(--accent); border-radius: 999px; }
+.comp-row { margin-bottom: 14px; }
+.comp-head { display: flex; justify-content: space-between; align-items: center; font-size: 14px; margin-bottom: 6px; }
+.comp-chip {
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 34px;
+  text-align: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
 .comp-note { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
 
-.pq { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 10px; }
-.pq .pq-q { font-weight: 600; margin-bottom: 4px; }
-.pq .pq-a { color: var(--muted); font-size: 14px; margin-bottom: 8px; white-space: pre-wrap; }
+/* Per-question timeline */
+.sparkline { display: block; width: 100%; margin: 4px 0 18px; }
+.spark-label { fill: var(--muted); font-size: 10px; }
+.spark-wrap { margin-bottom: 8px; }
+.pq-list { display: flex; flex-direction: column; gap: 10px; }
+
+.pq {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  background: var(--panel-2);
+}
+.pq .pq-q { font-weight: 600; margin-bottom: 4px; padding-right: 44px; }
 .pq .pq-fb { font-size: 13px; color: #b9c6ff; }
-.pq-score { float: right; font-weight: 700; }
+.pq-chip {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  font-weight: 700;
+  font-size: 13px;
+  min-width: 34px;
+  text-align: center;
+  padding: 1px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+}
+
+.confetti-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  z-index: 50;
+}
 
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
