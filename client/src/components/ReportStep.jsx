@@ -3,6 +3,7 @@ import RadarChart from './charts/RadarChart.jsx';
 import Sparkline from './charts/Sparkline.jsx';
 import Confetti from './charts/Confetti.jsx';
 import { useCountUp } from '../hooks/useCountUp.js';
+import { formatDuration } from '../hooks/useStopwatch.js';
 import { clampScore, scoreColor, scoreBand } from '../scoreUtils.js';
 
 // Animated competency bar with a count-up chip and a color-coded fill.
@@ -26,8 +27,9 @@ function CompetencyBar({ name, score, note, delay = 0 }) {
 }
 
 // Color-coded per-question card: colored left border + score chip.
-function QuestionCard({ index, question, score, feedback }) {
+function QuestionCard({ index, question, score, feedback, durationMs }) {
   const color = scoreColor(score);
+  const hasTime = Number.isFinite(durationMs) && durationMs > 0;
   return (
     <div className="pq" style={{ borderLeft: `4px solid ${color}` }}>
       <span className="pq-chip" style={{ color, borderColor: `${color}66` }}>
@@ -35,6 +37,9 @@ function QuestionCard({ index, question, score, feedback }) {
       </span>
       <div className="pq-q">Q{index + 1}: {question}</div>
       {feedback && <div className="pq-fb">{feedback}</div>}
+      {hasTime && (
+        <div className="pq-time">⏱ {formatDuration(durationMs / 1000)} on this answer</div>
+      )}
     </div>
   );
 }
@@ -66,9 +71,22 @@ export default function ReportStep({ report, role, onRestart }) {
     <div className="report">
       <Confetti fire={celebrate} />
 
+      {/* Shown only when printing / saving to PDF */}
+      <div className="print-header print-only">
+        <div className="print-brand">🎙️ AI Mock Interviewer</div>
+        <div className="print-meta">
+          {role} · {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
+        </div>
+      </div>
+
       {/* Hero header: gauge + verdict + summary */}
       <div className="card hero">
-        <div className="step-label">Results</div>
+        <div className="hero-top no-print">
+          <div className="step-label">Results</div>
+          <button className="ghost small download-btn" onClick={() => window.print()}>
+            ⬇ Download PDF
+          </button>
+        </div>
         <div className="hero-grid">
           <ScoreGauge score={overall} />
           <div className="hero-body">
@@ -142,13 +160,14 @@ export default function ReportStep({ report, role, onRestart }) {
                 question={q.question}
                 score={q.score}
                 feedback={q.feedback}
+                durationMs={q.durationMs}
               />
             ))}
           </div>
         </div>
       )}
 
-      <div className="row" style={{ marginTop: 4 }}>
+      <div className="row no-print" style={{ marginTop: 4 }}>
         <div className="spacer" />
         <button className="primary" onClick={onRestart}>
           Start a new interview

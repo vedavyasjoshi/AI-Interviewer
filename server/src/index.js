@@ -124,7 +124,7 @@ app.post('/api/interview/start', async (req, res) => {
 // adaptive follow-up or signal that the interview is complete.
 app.post('/api/interview/answer', async (req, res) => {
   try {
-    const { sessionId, answer } = req.body || {};
+    const { sessionId, answer, durationMs } = req.body || {};
     const session = sessions.get(sessionId);
     if (!session) {
       return res.status(404).json({ error: 'Unknown or expired session.' });
@@ -133,10 +133,12 @@ app.post('/api/interview/answer', async (req, res) => {
       return res.status(400).json({ error: 'No pending question to answer.' });
     }
 
-    // Commit the Q/A pair.
+    // Commit the Q/A pair. durationMs is optional (older clients omit it).
+    const dur = Number(durationMs);
     session.history.push({
       question: session.pendingQuestion,
       answer: (answer || '').trim(),
+      durationMs: Number.isFinite(dur) && dur >= 0 ? Math.round(dur) : null,
     });
     session.pendingQuestion = null;
 
@@ -172,6 +174,16 @@ app.post('/api/interview/report', async (req, res) => {
     }
 
     const report = await generateReport(session.resume, session.role, session.history);
+
+    // Attach per-question timing (captured client-side) onto the report by
+    // index — perQuestion order matches the interview history order.
+    if (Array.isArray(report.perQuestion)) {
+      report.perQuestion = report.perQuestion.map((q, i) => ({
+        ...q,
+        durationMs: session.history[i]?.durationMs ?? null,
+      }));
+    }
+
     res.json({
       report,
       role: session.role.label,

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { submitAnswer, serverTTS, serverSTT } from '../api.js';
+import { useStopwatch, formatDuration } from '../hooks/useStopwatch.js';
+import Waveform from './charts/Waveform.jsx';
 import {
   speakBrowser,
   stopSpeaking,
@@ -36,6 +38,10 @@ export default function InterviewStep({
   const recorderRef = useRef(null);
   const recognizerRef = useRef(null);
   const spokenForRef = useRef(null); // guards against double-speak (StrictMode/re-renders)
+
+  // Per-question stopwatch. Resets on each new question; pauses while the
+  // interviewer is speaking so timing reflects the candidate's thinking time.
+  const { elapsed, getElapsedMs } = useStopwatch(question, !speaking);
 
   // Speak each new question as it arrives — exactly once per question.
   useEffect(() => {
@@ -78,6 +84,13 @@ export default function InterviewStep({
     } finally {
       setSpeaking(false);
     }
+  }
+
+  // Stop whatever is currently being spoken.
+  function stopSpeakingNow() {
+    stopAudio();
+    stopSpeaking();
+    setSpeaking(false);
   }
 
   async function startRecording() {
@@ -147,11 +160,13 @@ export default function InterviewStep({
     onError('');
     stopSpeaking();
 
+    const durationMs = getElapsedMs();
+
     // Record locally for display.
     setHistory((h) => [...h, { question, answer }]);
 
     try {
-      const res = await submitAnswer(sessionId, answer);
+      const res = await submitAnswer(sessionId, answer, durationMs);
       setTranscript('');
       setInterim('');
       if (res.done) {
@@ -171,6 +186,9 @@ export default function InterviewStep({
       <div className="row">
         <div className="step-label">Interview in progress</div>
         <div className="spacer" />
+        <div className="timer" title="Time on this question">
+          ⏱ {formatDuration(elapsed)}
+        </div>
         <div className="progress">
           Question {questionNumber} of {maxQuestions}
         </div>
@@ -179,23 +197,30 @@ export default function InterviewStep({
       <div className="qbubble" style={{ marginTop: 10 }}>{question}</div>
 
       <div className="row" style={{ marginTop: 10 }}>
-        {speaking ? (
+        {speaking && (
           <span className="speaking">
             <span className="dot" /> Speaking…
           </span>
-        ) : (
-          <button className="ghost small" onClick={() => speak(question)}>
-            🔊 Replay question
-          </button>
         )}
+        {recording && (
+          <div className="rec-panel">
+            <div className="recording">
+              <span className="rec-dot" /> Recording…
+            </div>
+            <Waveform active={recording} bars={20} />
+          </div>
+        )}
+        <div className="spacer" />
+        <button
+          className="ghost small"
+          onClick={speaking ? stopSpeakingNow : () => speak(question)}
+          title={speaking ? 'Stop reading the question aloud' : 'Play the question aloud'}
+        >
+          {speaking ? '⏹ Stop' : '🔊 Play question'}
+        </button>
       </div>
 
       <h3>Your answer</h3>
-      {recording && (
-        <div className="recording" style={{ marginBottom: 8 }}>
-          <span className="rec-dot" /> Recording… speak now
-        </div>
-      )}
       {transcribing && <div className="progress" style={{ marginBottom: 8 }}>Transcribing…</div>}
 
       <textarea

@@ -165,7 +165,7 @@ export default function App() {
       )}
 
       <p className="small muted" style={{ marginTop: 24, textAlign: 'center' }}>
-        Hackathon build · in-memory sessions · works fully offline in mock mode.
+        In-memory sessions · works fully offline in mock mode.
       </p>
     </div>
   );

@@ -49,12 +49,12 @@ export async function startInterview(resume, roleId) {
   );
 }
 
-export async function submitAnswer(sessionId, answer) {
+export async function submitAnswer(sessionId, answer, durationMs) {
   return json(
     await fetch(apiUrl('/api/interview/answer'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ sessionId, answer }),
+      body: JSON.stringify({ sessionId, answer, durationMs }),
     })
   );
 }

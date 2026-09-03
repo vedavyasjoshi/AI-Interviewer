@@ -159,10 +159,34 @@ button.ghost { background: transparent; }
 .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); animation: pulse 1s infinite; }
 @keyframes pulse { 0%,100% { opacity: 0.3; } 50% { opacity: 1; } }
 
-.recording { color: var(--danger); display: inline-flex; align-items: center; gap: 8px; font-size: 13px; }
+.rec-panel {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 107, 107, 0.3);
+  background: rgba(255, 107, 107, 0.06);
+}
+.waveform {
+  width: 130px;
+  height: 28px;
+  display: block;
+}
+.recording { color: var(--danger); display: inline-flex; align-items: center; gap: 8px; font-size: 13px; white-space: nowrap; }
 .rec-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--danger); animation: pulse 0.8s infinite; }
 
 .progress { color: var(--muted); font-size: 13px; }
+.timer {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(108, 140, 255, 0.3);
+  background: rgba(108, 140, 255, 0.08);
+}
 
 textarea {
   width: 100%;
@@ -194,6 +218,21 @@ textarea {
 }
 
 /* Hero header */
+.hero-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+.hero-top .step-label { margin-bottom: 0; }
+.download-btn {
+  border-color: rgba(108, 140, 255, 0.5);
+  color: #b9c6ff;
+  background: rgba(108, 140, 255, 0.08);
+  font-weight: 600;
+}
+.download-btn:hover:not(:disabled) { background: rgba(108, 140, 255, 0.16); }
+
 .hero-grid {
   display: flex;
   align-items: center;
@@ -275,6 +314,12 @@ textarea {
 }
 .pq .pq-q { font-weight: 600; margin-bottom: 4px; padding-right: 44px; }
 .pq .pq-fb { font-size: 13px; color: #b9c6ff; }
+.pq .pq-time {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
 .pq-chip {
   position: absolute;
   top: 12px;
@@ -299,3 +344,78 @@ textarea {
 
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
+
+/* Print-only elements are hidden on screen, revealed when printing. */
+.print-only { display: none; }
+
+/* ----------------------------------------------------------------------
+   Print / Save-as-PDF: isolate the report, switch to light-on-white so it
+   reads cleanly on paper, and keep chart colors intact.
+   ---------------------------------------------------------------------- */
+@media print {
+  /* Preserve background/gradient colors for charts and chips. */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  body {
+    background: #ffffff !important;
+    color: #14161d !important;
+  }
+
+  /* Hide everything except the report subtree. */
+  .app > *:not(.report) { display: none !important; }
+  .no-print { display: none !important; }
+  .confetti-canvas { display: none !important; }
+
+  .print-only { display: block; }
+
+  .app { max-width: 100%; padding: 0; margin: 0; }
+
+  .report { animation: none !important; }
+
+  .print-header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2px solid #14161d;
+    padding-bottom: 10px;
+    margin-bottom: 16px;
+  }
+  .print-brand { font-size: 20px; font-weight: 800; }
+  .print-meta { font-size: 13px; color: #555; }
+
+  /* Cards become clean bordered blocks on white. */
+  .card {
+    background: #ffffff !important;
+    border: 1px solid #d0d3dd !important;
+    box-shadow: none !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 12px;
+  }
+
+  .card h2, .card h3, .hero-title { color: #14161d !important; }
+  .hero-summary, .muted, .comp-note, .list, .radar-label, .spark-label, .pq-time {
+    color: #444 !important;
+  }
+  .radar-label, .spark-label { fill: #444 !important; }
+
+  /* Text bubbles / bars readable on white. */
+  .bar { background: #eef0f5 !important; border-color: #d0d3dd !important; }
+  .pq { background: #f7f8fb !important; }
+
+  /* Keep charts and question cards from splitting across pages. */
+  .radar-wrap, .spark-wrap, .pq, .comp-row, .hero-grid, .two-col > * {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* Layout tweaks so nothing runs off the page width. */
+  .dash-grid { grid-template-columns: 1fr 1fr; }
+
+  .gauge-num, .band { color: inherit; }
+
+  @page { margin: 14mm; }
+}
