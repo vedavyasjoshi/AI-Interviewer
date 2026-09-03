@@ -1,0 +1,70 @@
+# Render Blueprint — deploys the AI Interviewer as two services:
+#   1. ai-interviewer-server : Node web service (Express API)
+#   2. ai-interviewer-client : static site (Vite build)
+#
+# To deploy: push this file to GitHub, then in Render click
+# "New +" -> "Blueprint" and point it at this repo.
+#
+# After the first deploy, set the client's VITE_API_BASE_URL to the server's
+# public URL (Render shows it once the server is live), then trigger a client
+# redeploy so the value is baked into the build.
+
+services:
+  # ---------------------------------------------------------------------
+  # Backend API (Express)
+  # ---------------------------------------------------------------------
+  - type: web
+    name: ai-interviewer-server
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      # --- LLM (OpenAI-compatible; Groq free tier). Set in dashboard. ---
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_BASE_URL
+        value: https://api.groq.com/openai/v1
+      - key: OPENAI_MODEL
+        value: openai/gpt-oss-20b
+      # --- Text-to-speech (optional). Leave unset for browser fallback. ---
+      - key: ELEVENLABS_API_KEY
+        sync: false
+      - key: ELEVENLABS_VOICE_ID
+        value: 21m00Tcm4TlvDq8ikWAM
+      - key: ELEVENLABS_MODEL
+        value: eleven_turbo_v2
+      # --- Speech-to-text (optional). Leave unset for browser fallback. ---
+      - key: STT_API_KEY
+        sync: false
+      - key: STT_BASE_URL
+        value: https://api.openai.com/v1
+      - key: STT_MODEL
+        value: whisper-1
+      # --- CORS: set to the client's URL to lock down, or leave unset (open). ---
+      - key: CORS_ORIGIN
+        sync: false
+
+  # ---------------------------------------------------------------------
+  # Frontend (Vite static site)
+  # ---------------------------------------------------------------------
+  - type: web
+    name: ai-interviewer-client
+    runtime: static
+    rootDir: client
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      # Point the built client at the deployed server. Fill in the server's
+      # public URL after its first deploy, then redeploy the client.
+      - key: VITE_API_BASE_URL
+        sync: false
+    routes:
+      # SPA fallback so client-side routing / refreshes resolve to index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html

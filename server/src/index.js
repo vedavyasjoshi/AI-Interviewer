@@ -18,7 +18,9 @@ import { transcribe, sttConfigured } from './stt.js';
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-app.use(cors());
+// Allow all origins by default (demo-friendly). Set CORS_ORIGIN to a specific
+// origin (e.g. the deployed client URL) to lock it down in production.
+app.use(cors({ origin: process.env.CORS_ORIGIN || true }));
 app.use(express.json({ limit: '2mb' }));
 
 // In-memory upload handling (no disk writes — pragmatic for a demo).
