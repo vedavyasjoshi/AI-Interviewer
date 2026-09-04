@@ -41,8 +41,9 @@ services:
         value: https://api.groq.com/openai/v1
       - key: TTS_MODEL
         value: canopylabs/orpheus-v1-english
+      # Valid Groq Orpheus voices: autumn diana hannah austin daniel troy
       - key: TTS_VOICE
-        value: tara
+        value: austin
       - key: TTS_FORMAT
         value: wav
       # --- Speech-to-text (optional). Leave unset for browser fallback. ---
