@@ -127,6 +127,21 @@ button.ghost { background: transparent; }
 .role .role-name { font-weight: 600; margin-bottom: 6px; }
 .role .role-comp { font-size: 12px; color: var(--muted); line-height: 1.5; }
 
+.difficulty-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.level {
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  font-size: 14px;
+}
+.level.selected {
+  border-color: var(--accent);
+  color: #b9c6ff;
+  background: rgba(108, 140, 255, 0.12);
+  box-shadow: 0 0 0 2px rgba(108, 140, 255, 0.25);
+}
+
 .chips { display: flex; flex-wrap: wrap; gap: 6px; }
 .chip {
   font-size: 12px;
@@ -299,6 +314,24 @@ textarea {
 .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 640px) { .two-col { grid-template-columns: 1fr; } }
 
+/* Resume check */
+.insight-list { display: flex; flex-direction: column; gap: 8px; }
+.insight {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-2);
+  border-left: 3px solid var(--muted);
+}
+.insight-icon { flex-shrink: 0; }
+.insight-backed { border-left-color: var(--accent-2); background: rgba(78, 225, 160, 0.06); }
+.insight-gap { border-left-color: var(--warn); background: rgba(255, 204, 102, 0.06); }
+
 /* Per-question timeline */
 .sparkline { display: block; width: 100%; margin: 4px 0 18px; }
 .spark-label { fill: var(--muted); font-size: 10px; }
@@ -405,6 +438,7 @@ textarea {
   /* Text bubbles / bars readable on white. */
   .bar { background: #eef0f5 !important; border-color: #d0d3dd !important; }
   .pq { background: #f7f8fb !important; }
+  .insight { background: #f7f8fb !important; color: #14161d !important; break-inside: avoid; page-break-inside: avoid; }
 
   /* Keep charts and question cards from splitting across pages. */
   .radar-wrap, .spark-wrap, .pq, .comp-row, .hero-grid, .two-col > * {

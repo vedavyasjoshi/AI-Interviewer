@@ -1,5 +1,15 @@
-// Step 2: pick one of the three target roles.
-export default function RoleStep({ roles, selectedRole, onSelect, onStart, canStart, starting }) {
+// Step 2: pick a target role and difficulty level.
+export default function RoleStep({
+  roles,
+  selectedRole,
+  onSelect,
+  difficulties = [],
+  selectedDifficulty,
+  onSelectDifficulty,
+  onStart,
+  canStart,
+  starting,
+}) {
   return (
     <div className="card">
       <div className="step-label">Step 2</div>
@@ -16,6 +26,23 @@ export default function RoleStep({ roles, selectedRole, onSelect, onStart, canSt
           </button>
         ))}
       </div>
+
+      {difficulties.length > 0 && (
+        <>
+          <h3>Difficulty level</h3>
+          <div className="difficulty-row">
+            {difficulties.map((d) => (
+              <button
+                key={d.id}
+                className={`level ${selectedDifficulty === d.id ? 'selected' : ''}`}
+                onClick={() => onSelectDifficulty(d.id)}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
 
       <div className="row" style={{ marginTop: 18 }}>
         <div className="spacer" />

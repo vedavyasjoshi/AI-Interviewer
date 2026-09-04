@@ -4,7 +4,7 @@ import cors from 'cors';
 import multer from 'multer';
 import { randomUUID } from 'crypto';
 
-import { listRoles, getRole } from './roles.js';
+import { listRoles, getRole, listDifficulties, getDifficulty } from './roles.js';
 import { parseResumeFile } from './resumeParser.js';
 import {
   generateFirstQuestion,
@@ -47,6 +47,7 @@ app.get('/api/health', (_req, res) => {
       stt: sttConfigured,
     },
     roles: listRoles(),
+    difficulties: listDifficulties(),
     maxQuestions: MAX_QUESTIONS,
   });
 });
@@ -93,7 +94,7 @@ app.post('/api/resume/text', async (req, res) => {
 // Start: create a session, generate the first question.
 app.post('/api/interview/start', async (req, res) => {
   try {
-    const { resume, roleId } = req.body || {};
+    const { resume, roleId, difficulty: difficultyId } = req.body || {};
     const role = getRole(roleId);
     if (!role) {
       return res.status(400).json({ error: 'Invalid or missing roleId.' });
@@ -102,12 +103,14 @@ app.post('/api/interview/start', async (req, res) => {
       return res.status(400).json({ error: 'Missing parsed resume.' });
     }
 
-    const question = await generateFirstQuestion(resume, role);
+    const difficulty = getDifficulty(difficultyId);
+    const question = await generateFirstQuestion(resume, role, difficulty);
     const sessionId = randomUUID();
 
     sessions.set(sessionId, {
       role,
       resume,
+      difficulty,
       history: [], // completed [{ question, answer }]
       pendingQuestion: question, // asked, awaiting an answer
       createdAt: Date.now(),
@@ -146,7 +149,7 @@ app.post('/api/interview/answer', async (req, res) => {
       return res.json({ done: true, questionNumber: session.history.length, maxQuestions: MAX_QUESTIONS });
     }
 
-    const followUp = await generateFollowUp(session.resume, session.role, session.history);
+    const followUp = await generateFollowUp(session.resume, session.role, session.history, session.difficulty);
     session.pendingQuestion = followUp;
 
     res.json({
@@ -173,7 +176,7 @@ app.post('/api/interview/report', async (req, res) => {
       return res.status(400).json({ error: 'No answers recorded yet.' });
     }
 
-    const report = await generateReport(session.resume, session.role, session.history);
+    const report = await generateReport(session.resume, session.role, session.history, session.difficulty);
 
     // Attach per-question timing (captured client-side) onto the report by
     // index — perQuestion order matches the interview history order.

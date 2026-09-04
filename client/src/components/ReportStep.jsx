@@ -54,6 +54,7 @@ export default function ReportStep({ report, role, onRestart }) {
     improvements = [],
     competencyScores = [],
     perQuestion = [],
+    resumeInsights = [],
   } = report;
 
   const overall = clampScore(overallScore);
@@ -142,6 +143,25 @@ export default function ReportStep({ report, role, onRestart }) {
           </ul>
         </div>
       </div>
+
+      {resumeInsights.length > 0 && (
+        <div className="card">
+          <h3>Resume check</h3>
+          <p className="small muted" style={{ marginTop: -2, marginBottom: 12 }}>
+            How your answers lined up with what's on your resume.
+          </p>
+          <div className="insight-list">
+            {resumeInsights.map((ins, i) => (
+              <div className={`insight insight-${ins.type || 'neutral'}`} key={i}>
+                <span className="insight-icon">
+                  {ins.type === 'backed' ? '✅' : ins.type === 'gap' ? '⚠️' : '•'}
+                </span>
+                <span>{ins.text}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Per-question timeline */}
       {perQuestion.length > 0 && (

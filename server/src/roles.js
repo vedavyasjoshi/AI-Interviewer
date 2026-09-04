@@ -46,6 +46,45 @@ export const ROLES = {
   },
 };
 
+// Difficulty levels calibrate how hard questions are and how strictly answers
+// are scored. `guidance` is injected into the LLM prompts.
+export const DIFFICULTIES = {
+  easy: {
+    id: 'easy',
+    label: 'Easy',
+    guidance:
+      'Keep questions approachable and foundational. Favor breadth over ' +
+      'depth, allow the candidate to warm up, and score generously — reward ' +
+      'clear fundamentals. Still calibrate topics to the resume.',
+  },
+  medium: {
+    id: 'medium',
+    label: 'Medium',
+    guidance:
+      'Ask standard interview-level questions that expect solid fundamentals ' +
+      'plus real project ownership. Probe one level deeper on weak answers. ' +
+      'Score with balanced expectations.',
+  },
+  hard: {
+    id: 'hard',
+    label: 'Hard',
+    guidance:
+      'Push hard on depth, trade-offs, and reasoning under ambiguity. Follow ' +
+      'up relentlessly on gaps and expect concrete, quantified impact. Score ' +
+      'strictly — expect nuance and first-principles thinking.',
+  },
+};
+
+const DEFAULT_DIFFICULTY = 'medium';
+
+export function getDifficulty(id) {
+  return DIFFICULTIES[id] || DIFFICULTIES[DEFAULT_DIFFICULTY];
+}
+
+export function listDifficulties() {
+  return Object.values(DIFFICULTIES).map(({ id, label }) => ({ id, label }));
+}
+
 export function getRole(roleId) {
   return ROLES[roleId] || null;
 }

@@ -14,6 +14,7 @@ export default function App() {
 
   const [resume, setResume] = useState(null);
   const [selectedRole, setSelectedRole] = useState(null);
+  const [selectedDifficulty, setSelectedDifficulty] = useState('medium');
 
   const [session, setSession] = useState(null); // { sessionId, question, questionNumber, maxQuestions }
   const [starting, setStarting] = useState(false);
@@ -28,6 +29,7 @@ export default function App() {
   }, []);
 
   const roles = health?.roles || [];
+  const difficulties = health?.difficulties || [];
   const integrations = health?.integrations || { llm: false, tts: false, stt: false };
 
   async function handleStart() {
@@ -38,7 +40,7 @@ export default function App() {
     setStarting(true);
     setError('');
     try {
-      const res = await startInterview(resume, selectedRole);
+      const res = await startInterview(resume, selectedRole, selectedDifficulty);
       setSession(res);
       setPhase('interview');
     } catch (e) {
@@ -76,6 +78,7 @@ export default function App() {
   function restart() {
     setResume(null);
     setSelectedRole(null);
+    setSelectedDifficulty('medium');
     setSession(null);
     setReport(null);
     setReportRole('');
@@ -122,6 +125,9 @@ export default function App() {
               roles={roles}
               selectedRole={selectedRole}
               onSelect={setSelectedRole}
+              difficulties={difficulties}
+              selectedDifficulty={selectedDifficulty}
+              onSelectDifficulty={setSelectedDifficulty}
               onStart={handleStart}
               canStart={Boolean(resume && selectedRole)}
               starting={starting}

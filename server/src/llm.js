@@ -34,6 +34,13 @@ async function chat(messages, { json = false, temperature = 0.7 } = {}) {
   return data.choices?.[0]?.message?.content ?? '';
 }
 
+// Returns a sentence to append to a system prompt describing the target
+// difficulty. Empty string when no difficulty is provided.
+function difficultyLine(difficulty) {
+  if (!difficulty || !difficulty.guidance) return '';
+  return ` Difficulty — ${difficulty.label}: ${difficulty.guidance}`;
+}
+
 function resumeContext(resume, role) {
   const skills = (resume.skills || []).join(', ') || 'none listed';
   const experience = (resume.experience || []).slice(0, 6).join('\n- ');
@@ -56,7 +63,7 @@ function resumeContext(resume, role) {
 // ---------------------------------------------------------------------------
 
 /** Generate the opening interview question. */
-export async function generateFirstQuestion(resume, role) {
+export async function generateFirstQuestion(resume, role, difficulty) {
   if (!llmConfigured) return mockFirstQuestion(resume, role);
 
   try {
@@ -67,7 +74,8 @@ export async function generateFirstQuestion(resume, role) {
           content:
             'You are an expert technical interviewer. Ask one concise, ' +
             'spoken-style interview question at a time. Do not number it or add ' +
-            'preamble. Keep it under 45 words.',
+            'preamble. Keep it under 45 words.' +
+            difficultyLine(difficulty),
         },
         {
           role: 'user',
@@ -93,7 +101,7 @@ export async function generateFirstQuestion(resume, role) {
  * the candidate's most recent answer.
  * `history` is [{ question, answer }, ...].
  */
-export async function generateFollowUp(resume, role, history) {
+export async function generateFollowUp(resume, role, history, difficulty) {
   if (!llmConfigured) return mockFollowUp(resume, role, history);
 
   const transcript = history
@@ -109,7 +117,8 @@ export async function generateFollowUp(resume, role, history) {
             'You are an expert interviewer conducting an adaptive interview. ' +
             'Based on the candidate answers, ask ONE natural follow-up question ' +
             'that digs deeper, probes a gap, or moves to a new relevant area. ' +
-            'Spoken style, under 45 words, no numbering or preamble.',
+            'Spoken style, under 45 words, no numbering or preamble.' +
+            difficultyLine(difficulty),
         },
         {
           role: 'user',
@@ -128,7 +137,7 @@ export async function generateFollowUp(resume, role, history) {
 }
 
 /** Produce the final structured report. */
-export async function generateReport(resume, role, history) {
+export async function generateReport(resume, role, history, difficulty) {
   if (!llmConfigured) return mockReport(resume, role, history);
 
   const transcript = history
@@ -142,15 +151,26 @@ export async function generateReport(resume, role, history) {
           role: 'system',
           content:
             'You are an expert interviewer producing a fair, constructive ' +
-            'evaluation. Respond ONLY with a JSON object matching this schema:\n' +
+            'evaluation.' +
+            difficultyLine(difficulty) +
+            ' Calibrate all scores to the stated difficulty level. ' +
+            'Respond ONLY with a JSON object matching this schema:\n' +
             '{\n' +
             '  "overallScore": number (0-100),\n' +
             '  "summary": string,\n' +
             '  "strengths": string[],\n' +
             '  "improvements": string[],\n' +
             '  "competencyScores": [{ "name": string, "score": number (0-100), "note": string }],\n' +
-            '  "perQuestion": [{ "question": string, "score": number (0-100), "feedback": string }]\n' +
-            '}',
+            '  "perQuestion": [{ "question": string, "score": number (0-100), "feedback": string }],\n' +
+            '  "resumeInsights": [{ "type": "backed" | "gap" | "neutral", "text": string }]\n' +
+            '}\n' +
+            'resumeInsights: 2-4 observations that explicitly tie the interview ' +
+            'answers back to SPECIFIC items on the resume (named skills, ' +
+            'projects, or experience). Use "backed" when an answer substantiated ' +
+            'a resume claim, "gap" when a listed skill/experience was not ' +
+            'demonstrated or was weak when probed, and "neutral" otherwise. ' +
+            'Reference the resume item by name. If the resume has too little ' +
+            'detail, return an empty array.',
         },
         {
           role: 'user',
@@ -276,6 +296,8 @@ function mockReport(resume, role, history) {
   }
   improvements.push(`Deepen ${role.label}-specific fundamentals: ${role.focus.split(',')[0]}.`);
 
+  const resumeInsights = mockResumeInsights(resume, history);
+
   return {
     overallScore,
     summary:
@@ -289,5 +311,48 @@ function mockReport(resume, role, history) {
     improvements,
     competencyScores,
     perQuestion,
+    resumeInsights,
   };
+}
+
+// Heuristic resume-grounded insights for the mock evaluator: which listed
+// skills actually came up in the answers ("backed") versus went unmentioned
+// ("gap"), plus a note on quantified impact.
+function mockResumeInsights(resume, history) {
+  const insights = [];
+  const answersText = history
+    .map((t) => (t.answer || '').toLowerCase())
+    .join(' \n ');
+  const skills = (resume.skills || []).filter(Boolean);
+
+  const mentioned = [];
+  const unmentioned = [];
+  for (const skill of skills) {
+    const s = String(skill).toLowerCase().trim();
+    if (!s) continue;
+    if (answersText.includes(s)) mentioned.push(skill);
+    else unmentioned.push(skill);
+  }
+
+  if (mentioned.length) {
+    insights.push({
+      type: 'backed',
+      text: `You spoke to ${mentioned.slice(0, 3).join(', ')} from your resume during the interview.`,
+    });
+  }
+  if (unmentioned.length) {
+    insights.push({
+      type: 'gap',
+      text: `Listed on your resume but never came up: ${unmentioned.slice(0, 3).join(', ')}. Work these into your examples.`,
+    });
+  }
+
+  const quantified = history.some((t) => /\d/.test(t.answer || ''));
+  insights.push(
+    quantified
+      ? { type: 'backed', text: 'Your answers included concrete numbers, which reinforces the impact claimed on your resume.' }
+      : { type: 'gap', text: 'Your resume implies measurable impact, but answers lacked specific metrics — quantify results.' }
+  );
+
+  return insights.slice(0, 4);
 }
