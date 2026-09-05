@@ -46,8 +46,21 @@ export function unlockSpeech() {
 export async function speakBrowser(text) {
   if (!('speechSynthesis' in window) || !text) return;
   const voices = await loadVoices();
-  return new Promise((resolve) => {
+  // Clear any queued/oscillating state, then wait a beat. Calling speak()
+  // immediately after cancel() can make Chrome fire onend instantly (utterance
+  // never actually speaks), which is why speech "flashes" and vanishes.
+  try {
     window.speechSynthesis.cancel();
+  } catch {
+    /* ignore */
+  }
+  await new Promise((r) => setTimeout(r, 120));
+  return new Promise((resolve) => {
+    try {
+      window.speechSynthesis.resume();
+    } catch {
+      /* ignore */
+    }
     const utter = new SpeechSynthesisUtterance(text);
     utter.rate = 1.0;
     utter.pitch = 1.0;
@@ -65,14 +78,34 @@ export async function speakBrowser(text) {
       settled = true;
       resolve();
     };
-    utter.onend = finish;
-    utter.onerror = finish;
+    // Chrome bug: the synth engine pauses itself (after gesture-chain breaks
+    // or ~15s in). Nudge it with resume() on an interval while speaking.
+    const keepAlive = setInterval(() => {
+      try {
+        if (window.speechSynthesis.speaking) window.speechSynthesis.resume();
+      } catch {
+        /* ignore */
+      }
+    }, 4000);
+
+    const wrappedFinish = () => {
+      clearInterval(keepAlive);
+      finish();
+    };
+    utter.onend = wrappedFinish;
+    utter.onerror = wrappedFinish;
     // Safety net: some browsers never fire onend for long text. Estimate a
     // max duration (~15 chars/sec) and resolve after that as a fallback.
     const maxMs = Math.min(30000, Math.max(3000, (text.length / 15) * 1000 + 1500));
-    setTimeout(finish, maxMs);
+    setTimeout(wrappedFinish, maxMs);
 
     window.speechSynthesis.speak(utter);
+    // Immediate nudge in case the engine started paused.
+    try {
+      window.speechSynthesis.resume();
+    } catch {
+      /* ignore */
+    }
   });
 }
 

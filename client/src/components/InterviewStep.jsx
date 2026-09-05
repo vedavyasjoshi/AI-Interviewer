@@ -57,6 +57,9 @@ export default function InterviewStep({
   // still playing and tear down any in-progress recording so nothing keeps
   // running in the background after we leave the interview screen.
   useEffect(() => {
+    // Reset on (re)mount — React 18 StrictMode mounts, unmounts, then remounts
+    // in dev; without this reset the flag would stay true and block speak().
+    unmountedRef.current = false;
     return () => {
       unmountedRef.current = true;
       stopAudio();
