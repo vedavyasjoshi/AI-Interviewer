@@ -45,7 +45,7 @@ function QuestionCard({ index, question, score, feedback, durationMs }) {
 }
 
 // Final step: render the LLM-generated evaluation report as a dashboard.
-export default function ReportStep({ report, role, onRestart }) {
+export default function ReportStep({ report, role, onRestart, restartLabel = 'Start a new interview' }) {
   if (!report) return null;
   const {
     overallScore = 0,
@@ -190,7 +190,7 @@ export default function ReportStep({ report, role, onRestart }) {
       <div className="row no-print" style={{ marginTop: 4 }}>
         <div className="spacer" />
         <button className="primary" onClick={onRestart}>
-          Start a new interview
+          {restartLabel}
         </button>
       </div>
     </div>

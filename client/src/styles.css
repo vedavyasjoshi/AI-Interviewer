@@ -411,6 +411,15 @@ textarea {
 .muted { color: var(--muted); }
 .small { font-size: 13px; }
 
+.avatar {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  object-fit: cover;
+}
+.avatar-lg { width: 44px; height: 44px; }
+
 /* Print-only elements are hidden on screen, revealed when printing. */
 .print-only { display: none; }
 

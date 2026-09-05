@@ -23,6 +23,39 @@ export async function getHealth() {
   return json(await fetch(apiUrl('/api/health')));
 }
 
+// -----------------------------------------------------------------------
+// Auth + profile history
+// -----------------------------------------------------------------------
+
+/** Exchange a Google ID token for our own session token + user profile. */
+export async function authGoogle(idToken) {
+  return json(
+    await fetch(apiUrl('/api/auth/google'), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    })
+  );
+}
+
+/** Validate a stored session token and fetch the current user's profile. */
+export async function getMe(token) {
+  return json(
+    await fetch(apiUrl('/api/auth/me'), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  );
+}
+
+/** A signed-in user's past practice sessions, most recent first. */
+export async function getHistory(token) {
+  return json(
+    await fetch(apiUrl('/api/history'), {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+  );
+}
+
 export async function uploadResume(file) {
   const form = new FormData();
   form.append('resume', file);
@@ -59,11 +92,17 @@ export async function submitAnswer(sessionId, answer, durationMs) {
   );
 }
 
-export async function getReport(sessionId) {
+// `token` is optional: when present, the server attaches this report to the
+// signed-in user's practice history; when absent, the report is still
+// generated as normal, it just isn't saved server-side (caller falls back
+// to device-local history — see localHistory.js).
+export async function getReport(sessionId, token) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (token) headers.Authorization = `Bearer ${token}`;
   return json(
     await fetch(apiUrl('/api/interview/report'), {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ sessionId }),
     })
   );

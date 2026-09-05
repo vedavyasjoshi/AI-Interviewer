@@ -21,6 +21,10 @@ scored feedback report — running entirely on **free** services.
   on every call (the LLM API itself is stateless).
 - **Final report** — At the end you get feedback, an overall score, per-question
   scoring, strengths, and areas of improvement.
+- **Google Sign-In + Profile** — Sign in with Google to save every completed
+  interview to your account and revisit it later from your **Profile** page.
+  Skip sign-in and the app still works fully as a guest — history is just kept
+  on that device only, in the browser, instead of on the server.
 
 ## The free stack
 
@@ -60,11 +64,20 @@ even if a provider is unconfigured or rate-limited:
 
 **Pragmatic hackathon choices:**
 - Interview session state is kept **in-memory** on the server (a `Map` keyed by
-  session id). No database — sessions are lost on server restart.
+  session id). No database — an *in-progress* interview is lost on server
+  restart.
+- User profiles and completed **practice history** persist to a small JSON
+  file (`server/data/db.json`), so — unlike the in-progress session above —
+  they survive a server restart. It's still zero external services and zero
+  cost; swap `server/src/store.js` for a real database later without
+  touching any callers.
 - Integrations are **decoupled**: the LLM, TTS, and STT each read their own env
   vars, so you can mix providers (e.g. Groq LLM + browser STT) freely.
 - The frontend uses the browser's Web Speech API where server integrations
   aren't configured — great for offline/zero-cost demos.
+- **Google Sign-In** follows the same fallback philosophy: if it isn't
+  configured, the app runs as a guest (history saved to that browser via
+  `localStorage`) instead of blocking anyone from using it.
 
 ## Prerequisites
 
@@ -121,6 +134,40 @@ STT_API_KEY=
 > **Security:** `.env` is gitignored — never commit your key. If a key is ever
 > exposed, rotate it at https://console.groq.com/keys.
 
+### Configure Google Sign-In (optional)
+
+Without this, the app runs fine as a guest — history just stays on that one
+device instead of following the user's account. To enable it:
+
+1. Go to https://console.cloud.google.com/apis/credentials (any Google
+   account; no billing required).
+2. **Create Credentials → OAuth client ID → Web application.**
+3. Under **Authorized JavaScript origins**, add every URL you'll open the app
+   from, e.g. `http://localhost:5173` for local dev, plus your deployed
+   client URL. (No redirect URI is needed — sign-in happens entirely in the
+   browser via Google Identity Services.)
+4. Copy the generated **Client ID** into *both* of these — it must be the
+   exact same value in both places, since the server checks that the token's
+   audience matches:
+
+   ```bash
+   # server/.env
+   GOOGLE_CLIENT_ID=xxxxxxxxxx.apps.googleusercontent.com
+   JWT_SECRET=any-long-random-string   # signs our own session tokens
+   ```
+
+   ```bash
+   # client/.env  (copy client/.env.example first: cp client/.env.example client/.env)
+   VITE_GOOGLE_CLIENT_ID=xxxxxxxxxx.apps.googleusercontent.com
+   ```
+5. Restart both the server and the client dev server so the new env vars
+   are picked up.
+
+`JWT_SECRET` can be left unset for a quick demo — a random secret is
+generated at boot — but then everyone is signed out if the server restarts,
+since it can no longer verify session tokens it issued before. Set a fixed
+value to keep people signed in across restarts/deploys.
+
 ## Run
 
 Open two terminals:
@@ -140,14 +187,19 @@ support). Allow microphone access when prompted.
 
 ## Demo flow
 
-1. Upload a resume (or click **Use sample resume**).
-2. Pick a role.
-3. Click **Start interview** — the AI asks a question, spoken aloud in the
+1. (Optional) **Sign in with Google**, top right — or skip it and continue as
+   a guest; either way the interview works the same.
+2. Upload a resume (or click **Use sample resume**).
+3. Pick a role.
+4. Click **Start interview** — the AI asks a question, spoken aloud in the
    Austin voice.
-4. Click **Record answer**, speak, then **Stop**. Your answer is transcribed.
-5. The AI asks an adaptive follow-up. Repeat (up to 6 questions).
-6. Click **Finish early & get report** (or reach the last question) to see your
-   scored feedback.
+5. Click **Record answer**, speak, then **Stop**. Your answer is transcribed.
+6. The AI asks an adaptive follow-up. Repeat (up to 6 questions).
+7. Click **Finish early & get report** (or reach the last question) to see your
+   scored feedback. If you're signed in, this is saved to your account
+   automatically; as a guest it's saved to this browser only.
+8. Click **Profile** (top right) any time to revisit past sessions and reopen
+   any report.
 
 ## Notes & limits
 
@@ -156,4 +208,14 @@ support). Allow microphone access when prompted.
   ~7 LLM calls, so a demo sits well inside these limits.
 - **Browser voice varies by OS/browser** — test TTS/STT on the machine you'll
   demo on. Chrome is recommended.
-- **No persistence** — restarting the server clears in-progress interviews.
+- **In-progress interviews don't persist** — restarting the server clears any
+  interview that hasn't reached its final report yet. Completed reports for
+  signed-in users (and the user profiles themselves) do persist, in
+  `server/data/db.json` — the last 50 sessions per user are kept.
+- **Guest history is per-browser** — it's stored in that browser's
+  `localStorage`, so it won't show up on another device, and clearing site
+  data clears it. Signing in with Google moves history to the server, where
+  it follows the account instead.
+- **On Render specifically**, `server/data/db.json` survives restarts but
+  *not* redeploys (free-tier disk is ephemeral across deploys) — add a
+  persistent disk if you need history to survive a redeploy.
