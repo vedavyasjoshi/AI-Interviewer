@@ -11,9 +11,10 @@ import {
   generateFollowUp,
   generateReport,
   llmConfigured,
+  llmModel,
 } from './llm.js';
-import { synthesize, ttsConfigured, audioContentType } from './tts.js';
-import { transcribe, sttConfigured } from './stt.js';
+import { synthesize, ttsConfigured, ttsProvider, audioContentType } from './tts.js';
+import { transcribe, sttConfigured, sttProvider } from './stt.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -35,7 +36,7 @@ const upload = multer({
 // -----------------------------------------------------------------------
 const sessions = new Map();
 
-const MAX_QUESTIONS = 6; // cap the adaptive loop for a tight demo
+const MAX_QUESTIONS = 5; // cap the adaptive loop for a tight demo
 
 // Health / capability probe so the frontend knows which integrations exist.
 app.get('/api/health', (_req, res) => {
@@ -43,8 +44,11 @@ app.get('/api/health', (_req, res) => {
     ok: true,
     integrations: {
       llm: llmConfigured,
+      llmModel,
       tts: ttsConfigured,
+      ttsProvider,
       stt: sttConfigured,
+      sttProvider,
     },
     roles: listRoles(),
     difficulties: listDifficulties(),

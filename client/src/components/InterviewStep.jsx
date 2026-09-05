@@ -111,6 +111,7 @@ export default function InterviewStep({
       if (!integrations.stt && hasBrowserSTT()) {
         const recognizer = new BrowserSpeechRecognizer();
         recognizer.onInterim = (t) => setInterim(t);
+        recognizer.onError = (msg) => onError(msg);
         recognizer.start();
         recognizerRef.current = recognizer;
       } else {

@@ -102,13 +102,13 @@ export default function App() {
       {health && (
         <div className="badges" style={{ marginBottom: 20 }}>
           <span className={`badge ${integrations.llm ? 'on' : 'mock'}`}>
-            LLM: {integrations.llm ? 'connected' : 'mock mode'}
+            LLM: {integrations.llm ? (integrations.llmModel || 'connected') : 'mock mode'}
           </span>
           <span className={`badge ${integrations.tts ? 'on' : 'mock'}`}>
-            TTS: {integrations.tts ? 'ElevenLabs' : 'browser voice'}
+            TTS: {integrations.tts ? (integrations.ttsProvider || 'server voice') : 'browser voice'}
           </span>
           <span className={`badge ${integrations.stt ? 'on' : 'mock'}`}>
-            STT: {integrations.stt ? 'Whisper' : 'browser voice'}
+            STT: {integrations.stt ? (integrations.sttProvider || 'server') : 'browser voice'}
           </span>
         </div>
       )}

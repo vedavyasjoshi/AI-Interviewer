@@ -12,7 +12,8 @@
 //   TTS_VOICE     - default tara
 //   TTS_FORMAT    - default wav (mp3 also supported by Groq)
 
-const API_KEY = process.env.TTS_API_KEY || process.env.OPENAI_API_KEY;
+const API_KEY =
+  process.env.TTS_API_KEY || process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY;
 const BASE_URL = process.env.TTS_BASE_URL || 'https://api.groq.com/openai/v1';
 const MODEL = process.env.TTS_MODEL || 'canopylabs/orpheus-v1-english';
 const VOICE = process.env.TTS_VOICE || 'tara';
@@ -22,6 +23,18 @@ const FORMAT = process.env.TTS_FORMAT || 'wav';
 // base URL is set. We gate on a dedicated flag so enabling server TTS is a
 // deliberate choice (browser voice remains the zero-config default).
 export const ttsConfigured = Boolean(process.env.TTS_API_KEY || process.env.TTS_BASE_URL);
+
+// Short, human-friendly provider label for the UI badge, inferred from the
+// endpoint. Null when server TTS isn't configured (browser voice is used).
+export const ttsProvider = (() => {
+  if (!ttsConfigured) return null;
+  const u = BASE_URL.toLowerCase();
+  if (u.includes('groq')) return 'Groq Orpheus';
+  if (u.includes('elevenlabs')) return 'ElevenLabs';
+  if (u.includes('openai')) return 'OpenAI';
+  if (u.includes('magica')) return 'Magica';
+  return MODEL || 'server TTS';
+})();
 
 // Content type to send back to the client for each supported format.
 const CONTENT_TYPE = {

@@ -24,17 +24,25 @@ services:
     envVars:
       - key: NODE_VERSION
         value: "20"
-      # --- LLM (OpenAI-compatible; Groq free tier). Set in dashboard. ---
-      - key: OPENAI_API_KEY
+      # --- LLM primary: Magica (OpenAI-compatible). Set key in dashboard. ---
+      # Browse models: https://inference.magica.com/v1/llm/models.json
+      - key: MAGICA_API_KEY
         sync: false
-      - key: OPENAI_BASE_URL
+      - key: MAGICA_BASE_URL
+        value: https://inference.magica.com/v1
+      - key: MAGICA_MODEL
+        value: openai/gpt-4o-mini
+      # --- LLM fallback: Groq (free). Used automatically if Magica fails. ---
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_BASE_URL
         value: https://api.groq.com/openai/v1
-      - key: OPENAI_MODEL
-        value: openai/gpt-oss-20b
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
       # --- Text-to-speech (Groq Orpheus, OpenAI-compatible). ---
       # Server TTS turns on when TTS_API_KEY or TTS_BASE_URL is set; otherwise
       # the client falls back to the browser voice. Set TTS_API_KEY in the
-      # dashboard (or leave it unset to reuse OPENAI_API_KEY).
+      # dashboard (or leave it unset to reuse GROQ_API_KEY).
       - key: TTS_API_KEY
         sync: false
       - key: TTS_BASE_URL

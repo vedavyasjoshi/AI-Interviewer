@@ -1,25 +1,49 @@
 // LLM integration (OpenAI-compatible chat completions) with a deterministic
 // mock fallback so the app is fully demoable without any API key.
 
-const API_KEY = process.env.OPENAI_API_KEY;
-const BASE_URL = process.env.OPENAI_BASE_URL || 'https://api.openai.com/v1';
-const MODEL = process.env.OPENAI_MODEL || 'gpt-4o-mini';
+// OpenAI-compatible LLM providers, tried in order. All speak the same
+// /chat/completions protocol (Magica, OpenAI, Groq).
+//
+// Primary: Magica (MAGICA_* vars) — large token budget, no daily cap.
+// Fallback: Groq/OpenAI (OPENAI_* vars) — used automatically if the primary
+// call fails (auth, rate limit, network). If neither is configured, callers
+// degrade to the deterministic mock.
+const PROVIDERS = [
+  {
+    name: 'magica',
+    apiKey: process.env.MAGICA_API_KEY,
+    baseUrl: process.env.MAGICA_BASE_URL || 'https://inference.magica.com/v1',
+    model: process.env.MAGICA_MODEL || 'openai/gpt-4o-mini',
+  },
+  {
+    name: 'groq',
+    apiKey: process.env.GROQ_API_KEY || process.env.OPENAI_API_KEY,
+    baseUrl:
+      process.env.GROQ_BASE_URL ||
+      process.env.OPENAI_BASE_URL ||
+      'https://api.groq.com/openai/v1',
+    model: process.env.GROQ_MODEL || process.env.OPENAI_MODEL || 'openai/gpt-oss-120b',
+  },
+].filter((p) => p.apiKey);
 
-export const llmConfigured = Boolean(API_KEY);
+export const llmConfigured = PROVIDERS.length > 0;
+
+// The model that will actually be used (first configured provider), for
+// display in the UI. Null when running in mock mode.
+export const llmModel = PROVIDERS[0]?.model || null;
 
 /**
- * Low-level chat call. Returns the assistant message content string.
- * `json` = true asks the model for a JSON object response.
+ * Single request to one provider. Returns the assistant content string.
  */
-async function chat(messages, { json = false, temperature = 0.7 } = {}) {
-  const res = await fetch(`${BASE_URL}/chat/completions`, {
+async function callProvider(provider, messages, { json, temperature }) {
+  const res = await fetch(`${provider.baseUrl}/chat/completions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      Authorization: `Bearer ${API_KEY}`,
+      Authorization: `Bearer ${provider.apiKey}`,
     },
     body: JSON.stringify({
-      model: MODEL,
+      model: provider.model,
       messages,
       temperature,
       ...(json ? { response_format: { type: 'json_object' } } : {}),
@@ -32,6 +56,63 @@ async function chat(messages, { json = false, temperature = 0.7 } = {}) {
   }
   const data = await res.json();
   return data.choices?.[0]?.message?.content ?? '';
+}
+
+/**
+ * Low-level chat call. Tries each configured provider in order, falling back
+ * to the next on failure. Throws only if every provider fails (callers then
+ * degrade to the mock). `json = true` asks the model for a JSON response.
+ */
+async function chat(messages, { json = false, temperature = 0.7 } = {}) {
+  let lastErr;
+  for (const provider of PROVIDERS) {
+    try {
+      return await callProvider(provider, messages, { json, temperature });
+    } catch (err) {
+      lastErr = err;
+      console.error(`LLM provider "${provider.name}" failed: ${err.message}`);
+      // Try the next provider.
+    }
+  }
+  throw lastErr || new Error('No LLM providers configured');
+}
+
+// Robustly parse a JSON object from model output. Some OpenAI-compatible
+// providers (e.g. Magica) don't honor response_format, so the model may wrap
+// the JSON in prose or ```json fences. Strip fences and extract the first
+// balanced {...} block before parsing. Throws if no valid JSON is found.
+function parseJsonObject(content) {
+  const text = String(content).trim();
+  // Fast path: already clean JSON.
+  try {
+    return JSON.parse(text);
+  } catch {
+    /* fall through to extraction */
+  }
+  // Strip ```json ... ``` or ``` ... ``` fences.
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1].trim() : text;
+  try {
+    return JSON.parse(candidate);
+  } catch {
+    /* fall through to brace extraction */
+  }
+  // Extract the first balanced top-level object.
+  const start = candidate.indexOf('{');
+  if (start !== -1) {
+    let depth = 0;
+    for (let i = start; i < candidate.length; i++) {
+      const c = candidate[i];
+      if (c === '{') depth++;
+      else if (c === '}') {
+        depth--;
+        if (depth === 0) {
+          return JSON.parse(candidate.slice(start, i + 1));
+        }
+      }
+    }
+  }
+  throw new Error('No JSON object found in model output');
 }
 
 // Returns a sentence to append to a system prompt describing the target
@@ -184,7 +265,7 @@ export async function generateReport(resume, role, history, difficulty) {
       { json: true, temperature: 0.3 }
     );
 
-    return JSON.parse(content);
+    return parseJsonObject(content);
   } catch (err) {
     // Either the live call failed or the model returned malformed JSON — fall
     // back to the heuristic mock report so the interview always ends cleanly.

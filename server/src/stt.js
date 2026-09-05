@@ -13,6 +13,17 @@ const STT_MODEL = process.env.STT_MODEL || 'whisper-1';
 
 export const sttConfigured = Boolean(API_KEY);
 
+// Short provider label for the UI badge. Null when server STT isn't configured
+// (the browser's Web Speech recognition is used instead).
+export const sttProvider = (() => {
+  if (!sttConfigured) return null;
+  const u = String(BASE_URL).toLowerCase();
+  if (u.includes('groq')) return 'Groq Whisper';
+  if (u.includes('openai')) return 'Whisper';
+  if (u.includes('magica')) return 'Magica';
+  return STT_MODEL || 'server STT';
+})();
+
 /**
  * Transcribe an audio buffer. `filename` should carry the right extension
  * (e.g. audio.webm) so the API can infer the format. Throws if not configured.

@@ -164,6 +164,34 @@ export class BrowserSpeechRecognizer {
       this.rec.continuous = true;
       this.rec.interimResults = true;
       this.rec.lang = 'en-US';
+      this.manualStop = false;
+      // Surface recognition errors (they're otherwise silent). On Android the
+      // common ones are 'no-speech', 'network', 'not-allowed', 'aborted'.
+      this.rec.onerror = (e) => {
+        this.lastError = e.error;
+        if (this.onError && e.error && e.error !== 'no-speech' && e.error !== 'aborted') {
+          const messages = {
+            'not-allowed': 'Microphone permission was blocked. Allow mic access, or type your answer.',
+            'service-not-allowed': 'Speech recognition is unavailable on this device. Please type your answer.',
+            network: 'Speech recognition needs a network connection and failed. Please type your answer.',
+          };
+          this.onError(messages[e.error] || `Speech recognition error (${e.error}). You can type your answer.`);
+        }
+      };
+      // Android Chrome frequently ends recognition after a pause even in
+      // continuous mode. Auto-restart until the user explicitly stops, so a
+      // brief silence doesn't end the whole answer.
+      this.rec.onend = () => {
+        if (!this.manualStop && this.supported) {
+          try {
+            this.rec.start();
+            return;
+          } catch {
+            /* fall through to resolve */
+          }
+        }
+        if (this._resolveStop) this._resolveStop(this.transcript.trim());
+      };
       this.rec.onresult = (event) => {
         let finalText = '';
         for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -185,6 +213,8 @@ export class BrowserSpeechRecognizer {
 
   start() {
     this.transcript = '';
+    this.manualStop = false;
+    this.lastError = null;
     if (this.supported) {
       try {
         this.rec.start();
@@ -197,12 +227,15 @@ export class BrowserSpeechRecognizer {
   stop() {
     return new Promise((resolve) => {
       if (!this.supported) return resolve('');
-      this.rec.onend = () => resolve(this.transcript.trim());
+      this.manualStop = true; // prevent auto-restart in onend
+      this._resolveStop = resolve;
       try {
         this.rec.stop();
       } catch {
         resolve(this.transcript.trim());
       }
+      // Safety net: if onend never fires, resolve with what we have.
+      setTimeout(() => resolve(this.transcript.trim()), 1200);
     });
   }
 }
