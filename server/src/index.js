@@ -16,6 +16,8 @@ import {
 } from './llm.js';
 import { synthesize, ttsConfigured, ttsProvider, audioContentType } from './tts.js';
 import { transcribe, sttConfigured, sttProvider } from './stt.js';
+import { verifyGoogleIdToken, signSession, authConfigured, optionalAuth, requireAuth } from './auth.js';
+import { upsertUser, addHistoryEntry, getHistory } from './store.js';
 
 const app = express();
 const PORT = process.env.PORT || 4000;
@@ -50,11 +52,54 @@ app.get('/api/health', (_req, res) => {
       ttsProvider,
       stt: sttConfigured,
       sttProvider,
+      auth: authConfigured,
     },
     roles: listRoles(),
     difficulties: listDifficulties(),
     maxQuestions: MAX_QUESTIONS,
   });
+});
+
+// -----------------------------------------------------------------------
+// Auth: Google Sign-In + profile/history
+// -----------------------------------------------------------------------
+
+// Exchange a Google ID token (from the client's Sign-In-With-Google button)
+// for our own session token, creating/refreshing the user record as needed.
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    if (!authConfigured) {
+      return res.status(501).json({ error: 'Google sign-in is not configured on this server.' });
+    }
+    const { idToken } = req.body || {};
+    if (!idToken) {
+      return res.status(400).json({ error: 'Missing "idToken".' });
+    }
+    const profile = await verifyGoogleIdToken(idToken);
+    const user = await upsertUser(profile);
+    const token = signSession(user);
+    res.json({ token, user: { id: user.id, email: user.email, name: user.name, picture: user.picture } });
+  } catch (err) {
+    console.error('Google auth error:', err);
+    res.status(401).json({ error: 'Google sign-in failed.', detail: String(err.message || err) });
+  }
+});
+
+// Who am I? Lets the client restore a session on page load without
+// re-prompting Google, as long as the stored session token is still valid.
+app.get('/api/auth/me', requireAuth, (req, res) => {
+  res.json({ user: req.user });
+});
+
+// A signed-in user's past practice sessions, most recent first.
+app.get('/api/history', requireAuth, async (req, res) => {
+  try {
+    const history = await getHistory(req.user.id);
+    res.json({ history });
+  } catch (err) {
+    console.error('History fetch error:', err);
+    res.status(500).json({ error: 'Failed to load history.' });
+  }
 });
 
 // -----------------------------------------------------------------------
@@ -181,8 +226,10 @@ app.post('/api/interview/answer', async (req, res) => {
   }
 });
 
-// Report: generate the final evaluation from the full history.
-app.post('/api/interview/report', async (req, res) => {
+// Report: generate the final evaluation from the full history. If the
+// caller is signed in (optionalAuth), the completed report is also saved
+// to their practice history so it shows up on their Profile page.
+app.post('/api/interview/report', optionalAuth, async (req, res) => {
   try {
     const { sessionId } = req.body || {};
     const session = sessions.get(sessionId);
@@ -204,10 +251,27 @@ app.post('/api/interview/report', async (req, res) => {
       }));
     }
 
+    if (req.user) {
+      // Belt-and-suspenders: make sure the user row exists even if the data
+      // file was reset since they signed in (their token is still valid).
+      // Without this, a missing row would make history saves silently no-op.
+      await upsertUser(req.user);
+      await addHistoryEntry(req.user.id, {
+        id: sessionId,
+        createdAt: Date.now(),
+        role: session.role.label,
+        difficulty: session.difficulty?.label || null,
+        overallScore: report.overallScore ?? null,
+        report,
+        history: session.history,
+      });
+    }
+
     res.json({
       report,
       role: session.role.label,
       history: session.history,
+      saved: Boolean(req.user),
     });
   } catch (err) {
     console.error('Report error:', err);

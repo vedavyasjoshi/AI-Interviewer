@@ -8,6 +8,12 @@
 # After the first deploy, set the client's VITE_API_BASE_URL to the server's
 # public URL (Render shows it once the server is live), then trigger a client
 # redeploy so the value is baked into the build.
+#
+# Caveat: server/data/db.json (user profiles + practice history) lives on
+# local disk, which Render's free web service does NOT persist across
+# redeploys (only across restarts of the same running instance). Fine for a
+# hackathon demo; for anything longer-lived, add a Render persistent disk
+# mounted at server/data, or swap server/src/store.js for a real database.
 
 services:
   # ---------------------------------------------------------------------
@@ -64,6 +70,16 @@ services:
       # --- CORS: set to the client's URL to lock down, or leave unset (open). ---
       - key: CORS_ORIGIN
         sync: false
+      # --- Google Sign-In (optional). Leave both unset for guest-only mode. ---
+      # Must match VITE_GOOGLE_CLIENT_ID below exactly (server checks the
+      # token's audience against this value).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      # Signs our own session tokens. Set a fixed value so signed-in users
+      # stay signed in across deploys/restarts (otherwise a random one is
+      # generated at boot, which works but signs everyone out on restart).
+      - key: JWT_SECRET
+        sync: false
 
   # ---------------------------------------------------------------------
   # Frontend (Vite static site)
@@ -78,6 +94,10 @@ services:
       # Point the built client at the deployed server. Fill in the server's
       # public URL after its first deploy, then redeploy the client.
       - key: VITE_API_BASE_URL
+        sync: false
+      # Must match GOOGLE_CLIENT_ID above exactly. Leave both unset to run
+      # in guest-only mode (device-local history, no server-side profile).
+      - key: VITE_GOOGLE_CLIENT_ID
         sync: false
     routes:
       # SPA fallback so client-side routing / refreshes resolve to index.html.

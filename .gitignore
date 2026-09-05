@@ -5,6 +5,9 @@ node_modules/
 .env
 *.local
 
+# Runtime data (user profiles + practice history — regenerated on first run)
+server/data/
+
 # Build output
 dist/
 build/
