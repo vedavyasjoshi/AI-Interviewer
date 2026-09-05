@@ -74,7 +74,7 @@ export default function ReportStep({ report, role, onRestart }) {
 
       {/* Shown only when printing / saving to PDF */}
       <div className="print-header print-only">
-        <div className="print-brand">🎙️ AI Mock Interviewer</div>
+        <div className="print-brand">Garuda — AI Interview Coach</div>
         <div className="print-meta">
           {role} · {new Date().toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
         </div>

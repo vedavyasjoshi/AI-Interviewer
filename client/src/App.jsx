@@ -90,11 +90,13 @@ export default function App() {
     <div className="app">
       <div className="header">
         <div className="brand">
-          <span className="mic">🎙️</span> AI Mock Interviewer
+          <img className="brand-logo" src="/garuda-logo.png" alt="Garuda" />
+          <span className="brand-name">Garuda</span>
+          <span className="brand-sub">AI Interview Coach</span>
         </div>
       </div>
       <p className="subtitle">
-        Upload your resume, pick a role, and run an adaptive voice interview with instant feedback.
+        Practice, analyze, improve. Upload your resume, pick a role, and run an adaptive voice interview with instant feedback.
       </p>
 
       {health && (
