@@ -10,6 +10,7 @@ import {
   generateFirstQuestion,
   generateFollowUp,
   generateReport,
+  generateRoleProfile,
   llmConfigured,
   llmModel,
 } from './llm.js';
@@ -98,13 +99,25 @@ app.post('/api/resume/text', async (req, res) => {
 // Start: create a session, generate the first question.
 app.post('/api/interview/start', async (req, res) => {
   try {
-    const { resume, roleId, difficulty: difficultyId } = req.body || {};
-    const role = getRole(roleId);
-    if (!role) {
-      return res.status(400).json({ error: 'Invalid or missing roleId.' });
-    }
+    const { resume, roleId, customRole, difficulty: difficultyId } = req.body || {};
     if (!resume) {
       return res.status(400).json({ error: 'Missing parsed resume.' });
+    }
+
+    // A role is either one of the built-in ids, or a free-text custom role the
+    // user typed (title or description). Custom roles get an LLM-generated
+    // profile so the rest of the pipeline works unchanged.
+    let role;
+    if (customRole && String(customRole).trim()) {
+      role = await generateRoleProfile(customRole);
+      if (!role) {
+        return res.status(400).json({ error: 'Could not build a profile for that role.' });
+      }
+    } else {
+      role = getRole(roleId);
+      if (!role) {
+        return res.status(400).json({ error: 'Invalid or missing role.' });
+      }
     }
 
     const difficulty = getDifficulty(difficultyId);

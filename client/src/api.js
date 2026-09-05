@@ -39,12 +39,12 @@ export async function parseResumeText(text) {
   );
 }
 
-export async function startInterview(resume, roleId, difficulty) {
+export async function startInterview(resume, roleId, difficulty, customRole) {
   return json(
     await fetch(apiUrl('/api/interview/start'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ resume, roleId, difficulty }),
+      body: JSON.stringify({ resume, roleId, difficulty, customRole }),
     })
   );
 }

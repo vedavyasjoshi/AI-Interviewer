@@ -38,6 +38,7 @@ export default function InterviewStep({
   const recorderRef = useRef(null);
   const recognizerRef = useRef(null);
   const spokenForRef = useRef(null); // guards against double-speak (StrictMode/re-renders)
+  const unmountedRef = useRef(false); // set on unmount so async speak() bails out
 
   // Per-question stopwatch. Resets on each new question; pauses while the
   // interviewer is speaking so timing reflects the candidate's thinking time.
@@ -51,6 +52,33 @@ export default function InterviewStep({
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [question]);
+
+  // On unmount (finish early, interview complete, or restart), stop any audio
+  // still playing and tear down any in-progress recording so nothing keeps
+  // running in the background after we leave the interview screen.
+  useEffect(() => {
+    return () => {
+      unmountedRef.current = true;
+      stopAudio();
+      stopSpeaking();
+      if (recognizerRef.current) {
+        try {
+          recognizerRef.current.stop();
+        } catch {
+          /* ignore */
+        }
+        recognizerRef.current = null;
+      }
+      if (recorderRef.current) {
+        try {
+          recorderRef.current.stop();
+        } catch {
+          /* ignore */
+        }
+        recorderRef.current = null;
+      }
+    };
+  }, []);
 
   async function speak(text) {
     // Make sure any live speech recognition is stopped before speaking —
@@ -72,6 +100,11 @@ export default function InterviewStep({
       let url = null;
       if (integrations.tts) {
         url = await serverTTS(text);
+      }
+      // If we left the interview screen while fetching TTS, don't start audio.
+      if (unmountedRef.current) {
+        if (url) URL.revokeObjectURL(url);
+        return;
       }
       if (url) {
         await playAudioUrl(url);

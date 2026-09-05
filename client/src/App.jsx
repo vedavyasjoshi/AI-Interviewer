@@ -14,6 +14,7 @@ export default function App() {
 
   const [resume, setResume] = useState(null);
   const [selectedRole, setSelectedRole] = useState(null);
+  const [customRole, setCustomRole] = useState('');
   const [selectedDifficulty, setSelectedDifficulty] = useState('medium');
 
   const [session, setSession] = useState(null); // { sessionId, question, questionNumber, maxQuestions }
@@ -33,14 +34,20 @@ export default function App() {
   const integrations = health?.integrations || { llm: false, tts: false, stt: false };
 
   async function handleStart() {
-    if (!resume || !selectedRole) return;
+    const custom = customRole.trim();
+    if (!resume || (!selectedRole && !custom)) return;
     // Prime the browser speech engine while we still have the click gesture,
     // so the first auto-spoken question is allowed to play (Chrome autoplay).
     unlockSpeech();
     setStarting(true);
     setError('');
     try {
-      const res = await startInterview(resume, selectedRole, selectedDifficulty);
+      const res = await startInterview(
+        resume,
+        custom ? null : selectedRole,
+        selectedDifficulty,
+        custom || null
+      );
       setSession(res);
       setPhase('interview');
     } catch (e) {
@@ -78,6 +85,7 @@ export default function App() {
   function restart() {
     setResume(null);
     setSelectedRole(null);
+    setCustomRole('');
     setSelectedDifficulty('medium');
     setSession(null);
     setReport(null);
@@ -127,11 +135,13 @@ export default function App() {
               roles={roles}
               selectedRole={selectedRole}
               onSelect={setSelectedRole}
+              customRole={customRole}
+              onCustomRole={setCustomRole}
               difficulties={difficulties}
               selectedDifficulty={selectedDifficulty}
               onSelectDifficulty={setSelectedDifficulty}
               onStart={handleStart}
-              canStart={Boolean(resume && selectedRole)}
+              canStart={Boolean(resume && (selectedRole || customRole.trim()))}
               starting={starting}
             />
           )}

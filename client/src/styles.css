@@ -148,6 +148,18 @@ button.ghost { background: transparent; }
 .role .role-name { font-weight: 600; margin-bottom: 6px; }
 .role .role-comp { font-size: 12px; color: var(--muted); line-height: 1.5; }
 
+.custom-role {
+  width: 100%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  padding: 12px 14px;
+  font: inherit;
+}
+.custom-role::placeholder { color: var(--muted); }
+.custom-role.active { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(108,140,255,0.25); }
+
 .difficulty-row { display: flex; flex-wrap: wrap; gap: 8px; }
 .level {
   padding: 8px 16px;

@@ -143,6 +143,80 @@ function resumeContext(resume, role) {
 // Public API
 // ---------------------------------------------------------------------------
 
+/**
+ * Build a role profile from free-text user input (a role title, or a longer
+ * description / job posting). Returns { id, label, focus, competencies[5] } —
+ * the same shape as the built-in roles, so the rest of the pipeline (questions,
+ * scoring, radar) works unchanged. Falls back to a heuristic profile offline.
+ */
+export async function generateRoleProfile(text) {
+  const raw = String(text || '').trim();
+  if (!raw) return null;
+
+  if (!llmConfigured) return mockRoleProfile(raw);
+
+  try {
+    const content = await chat(
+      [
+        {
+          role: 'system',
+          content:
+            'You turn a user-provided job role (a short title or a longer ' +
+            'description) into an interview profile. Respond ONLY with a JSON ' +
+            'object of this shape:\n' +
+            '{ "label": string, "focus": string, "competencies": string[] }\n' +
+            'label: a clean role title (Title Case, <= 40 chars). ' +
+            'focus: one sentence naming the key areas an interview for this ' +
+            'role should cover. ' +
+            'competencies: EXACTLY 5 concise competency names (2-3 words each) ' +
+            'appropriate for this role; the last one should be Communication ' +
+            'unless clearly irrelevant.',
+        },
+        { role: 'user', content: `Role input:\n${raw}\n\nReturn the JSON.` },
+      ],
+      { json: true, temperature: 0.4 }
+    );
+    const parsed = parseJsonObject(content);
+    const label = String(parsed.label || raw).trim().slice(0, 60);
+    let competencies = Array.isArray(parsed.competencies)
+      ? parsed.competencies.map((c) => String(c).trim()).filter(Boolean)
+      : [];
+    // Normalize to exactly 5 for a consistent radar chart.
+    if (competencies.length > 5) competencies = competencies.slice(0, 5);
+    while (competencies.length < 5) competencies.push('Communication');
+    return {
+      id: 'custom',
+      label,
+      focus: String(parsed.focus || `core skills for a ${label}`).trim(),
+      competencies,
+    };
+  } catch (err) {
+    console.error('LLM generateRoleProfile failed, using mock:', err.message);
+    return mockRoleProfile(raw);
+  }
+}
+
+// Heuristic role profile when no LLM is configured.
+function mockRoleProfile(text) {
+  // Use the first line / first few words as the label.
+  const firstLine = text.split(/[\n.]/)[0].trim();
+  const label = (firstLine.length <= 48 ? firstLine : firstLine.slice(0, 45) + '…') || 'Custom Role';
+  return {
+    id: 'custom',
+    label,
+    focus:
+      `role-specific fundamentals, applied problem solving, relevant tools ` +
+      `and best practices, collaboration, and communication for a ${label}`,
+    competencies: [
+      'Role knowledge',
+      'Problem solving',
+      'Practical skills',
+      'Collaboration',
+      'Communication',
+    ],
+  };
+}
+
 /** Generate the opening interview question. */
 export async function generateFirstQuestion(resume, role, difficulty) {
   if (!llmConfigured) return mockFirstQuestion(resume, role);
@@ -189,26 +263,43 @@ export async function generateFollowUp(resume, role, history, difficulty) {
     .map((t, i) => `Q${i + 1}: ${t.question}\nA${i + 1}: ${t.answer}`)
     .join('\n\n');
 
+  // Decide this turn's mode. Mostly move to a NEW topic so the interview
+  // covers breadth across the resume and role, only occasionally drilling
+  // deeper on the last answer. This prevents the whole interview from becoming
+  // one long thread of follow-ups to question 1.
+  const goDeeper = Math.random() < 0.3; // ~30% deeper, ~70% new topic
+  const askedQuestions = history.map((t, i) => `Q${i + 1}: ${t.question}`).join('\n');
+  const modeInstruction = goDeeper
+    ? 'For THIS question, dig one level deeper into the candidate\'s most ' +
+      'recent answer — probe a specific claim, trade-off, or gap in it.'
+    : 'For THIS question, move to a DIFFERENT topic that has NOT been covered ' +
+      'yet — pull from a different skill, project, or experience on the resume, ' +
+      'or a different competency for the role. Do not follow up on the last ' +
+      'answer; start a fresh line of questioning.';
+
   try {
     const content = await chat(
       [
         {
           role: 'system',
           content:
-            'You are an expert interviewer conducting an adaptive interview. ' +
-            'Based on the candidate answers, ask ONE natural follow-up question ' +
-            'that digs deeper, probes a gap, or moves to a new relevant area. ' +
-            'Spoken style, under 45 words, no numbering or preamble.' +
+            'You are an expert interviewer conducting an interview that should ' +
+            'cover a BREADTH of topics across the candidate\'s background, not ' +
+            'a single deep thread. Ask ONE natural spoken-style question, under ' +
+            '45 words, no numbering or preamble. Avoid repeating topics already ' +
+            'asked about. ' +
+            modeInstruction +
             difficultyLine(difficulty),
         },
         {
           role: 'user',
           content:
             `Candidate context:\n${resumeContext(resume, role)}\n\n` +
-            `Interview so far:\n${transcript}\n\nAsk the next question.`,
+            `Questions already asked (avoid repeating these topics):\n${askedQuestions}\n\n` +
+            `Full interview so far:\n${transcript}\n\nAsk the next question.`,
         },
       ],
-      { temperature: 0.8 }
+      { temperature: 0.9 }
     );
     return content.trim();
   } catch (err) {
@@ -222,7 +313,11 @@ export async function generateReport(resume, role, history, difficulty) {
   if (!llmConfigured) return mockReport(resume, role, history);
 
   const transcript = history
-    .map((t, i) => `Q${i + 1}: ${t.question}\nA${i + 1}: ${t.answer}`)
+    .map((t, i) => {
+      const secs = Number.isFinite(t.durationMs) ? Math.round(t.durationMs / 1000) : null;
+      const timing = secs != null ? ` (response time: ${secs}s)` : '';
+      return `Q${i + 1}: ${t.question}\nA${i + 1}${timing}: ${t.answer}`;
+    })
     .join('\n\n');
 
   try {
@@ -235,6 +330,14 @@ export async function generateReport(resume, role, history, difficulty) {
             'evaluation.' +
             difficultyLine(difficulty) +
             ' Calibrate all scores to the stated difficulty level. ' +
+            'Each answer includes the candidate\'s response time in seconds. ' +
+            'Factor pacing into your scoring and feedback: crisp, well-paced ' +
+            'answers are a positive signal, while very long delays or rambling ' +
+            'that took a long time indicate hesitation or lack of fluency and ' +
+            'should lower the relevant scores (especially Communication) and be ' +
+            'called out in per-question feedback. Keep pacing a secondary factor ' +
+            '— answer quality still matters most, and a brief pause to think is ' +
+            'fine. ' +
             'Respond ONLY with a JSON object matching this schema:\n' +
             '{\n' +
             '  "overallScore": number (0-100),\n' +
@@ -320,8 +423,8 @@ function mockFollowUp(resume, role, history) {
   return `${ack}${templates[idx]}`;
 }
 
-/** Very rough heuristic scoring based on answer length/specificity. */
-function scoreAnswer(answer = '') {
+/** Very rough heuristic scoring based on answer length/specificity + pacing. */
+function scoreAnswer(answer = '', durationMs) {
   const words = answer.trim().split(/\s+/).filter(Boolean).length;
   // Count spelled-out numbers too (e.g. "thirty percent") — common in speech.
   const hasNumbers =
@@ -336,18 +439,36 @@ function scoreAnswer(answer = '') {
   let score = Math.min(55, words * 2); // up to 55 for a reasonably detailed answer
   if (hasNumbers) score += 22;
   if (hasSpecifics) score += 22;
+
+  // Light pacing penalty: allow ~1.5s per word plus 15s to think; penalize
+  // responses that ran well beyond that (hesitation / rambling).
+  if (Number.isFinite(durationMs) && durationMs > 0 && words > 0) {
+    const expectedMs = 15000 + words * 1500;
+    if (durationMs > expectedMs * 2) score -= 12;
+    else if (durationMs > expectedMs * 1.4) score -= 6;
+  }
+
   return Math.max(15, Math.min(100, Math.round(score)));
 }
 
+// True when a response was notably slow relative to its length.
+function wasSlow(answer = '', durationMs) {
+  const words = String(answer).trim().split(/\s+/).filter(Boolean).length;
+  if (!Number.isFinite(durationMs) || words === 0) return false;
+  return durationMs > (15000 + words * 1500) * 1.4;
+}
+
 function mockReport(resume, role, history) {
-  const perQuestion = history.map((t) => ({
-    question: t.question,
-    score: scoreAnswer(t.answer),
-    feedback:
-      scoreAnswer(t.answer) >= 70
+  const perQuestion = history.map((t) => {
+    const score = scoreAnswer(t.answer, t.durationMs);
+    const slow = wasSlow(t.answer, t.durationMs);
+    let feedback =
+      score >= 70
         ? 'Clear, specific answer with good detail.'
-        : 'Solid start — add concrete metrics and outcomes to strengthen it.',
-  }));
+        : 'Solid start — add concrete metrics and outcomes to strengthen it.';
+    if (slow) feedback += ' Took a while to respond — aim for a crisper, more confident delivery.';
+    return { question: t.question, score, feedback };
+  });
 
   const overallScore = perQuestion.length
     ? Math.round(perQuestion.reduce((s, q) => s + q.score, 0) / perQuestion.length)

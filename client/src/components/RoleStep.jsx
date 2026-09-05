@@ -1,8 +1,10 @@
-// Step 2: pick a target role and difficulty level.
+// Step 2: pick a target role (built-in or custom) and difficulty level.
 export default function RoleStep({
   roles,
   selectedRole,
   onSelect,
+  customRole,
+  onCustomRole,
   difficulties = [],
   selectedDifficulty,
   onSelectDifficulty,
@@ -10,6 +12,16 @@ export default function RoleStep({
   canStart,
   starting,
 }) {
+  // Picking a built-in role clears any custom text, and vice versa.
+  function pickRole(id) {
+    onCustomRole('');
+    onSelect(id);
+  }
+  function typeCustom(value) {
+    if (value) onSelect(null);
+    onCustomRole(value);
+  }
+
   return (
     <div className="card">
       <div className="step-label">Step 2</div>
@@ -19,13 +31,22 @@ export default function RoleStep({
           <button
             key={role.id}
             className={`role ${selectedRole === role.id ? 'selected' : ''}`}
-            onClick={() => onSelect(role.id)}
+            onClick={() => pickRole(role.id)}
           >
             <div className="role-name">{role.label}</div>
             <div className="role-comp">{role.competencies.join(' · ')}</div>
           </button>
         ))}
       </div>
+
+      <h3>Or enter a custom role</h3>
+      <input
+        className={`custom-role ${customRole.trim() ? 'active' : ''}`}
+        type="text"
+        value={customRole}
+        onChange={(e) => typeCustom(e.target.value)}
+        placeholder="e.g. DevOps Engineer, or paste a job description…"
+      />
 
       {difficulties.length > 0 && (
         <>
